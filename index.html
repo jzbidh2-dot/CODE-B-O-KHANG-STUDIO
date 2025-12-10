@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRIẾT CEO</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+    
+    <style>
+        :root {
+            --neon-green: #0f0;
+            --neon-blue: #00f3ff;
+            --dark-bg: #050505;
+            --glass: rgba(20, 20, 20, 0.7);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--dark-bg);
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--neon-green);
+            perspective: 1000px; /* Tạo chiều sâu 3D cho trang web */
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Hiệu ứng ma trận nền */
+        canvas#matrix {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.8;
+        }
+
+        /* Container 3D */
+        .editor-container {
+            width: 80%;
+            height: 80%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+            border: 1px solid var(--neon-green);
+            box-shadow: 0 0 20px var(--neon-green), inset 0 0 20px var(--neon-green);
+            background: var(--glass);
+            backdrop-filter: blur(5px);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Thanh tiêu đề giả lập VS Code */
+        .title-bar {
+            height: 40px;
+            background: rgba(0, 255, 0, 0.1);
+            border-bottom: 1px solid var(--neon-green);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--neon-green);
+            cursor: grab;
+        }
+
+        .window-controls span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .red { background: #ff5f56; box-shadow: 0 0 5px #ff5f56;}
+        .yellow { background: #ffbd2e; box-shadow: 0 0 5px #ffbd2e;}
+        .green { background: #27c93f; box-shadow: 0 0 5px #27c93f;}
+
+        /* Nút Lưu File */
+        .save-btn {
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 5px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: 0.3s;
+            box-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        .save-btn:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+
+        /* Tùy chỉnh vùng code */
+        .CodeMirror {
+            flex-grow: 1;
+            background: transparent !important;
+            font-size: 16px;
+            color: #ccc;
+        }
+        .CodeMirror-gutters {
+            background: rgba(0,0,0,0.5) !important;
+            border-right: 1px solid var(--neon-green) !important;
+        }
+        .CodeMirror-linenumber {
+            color: var(--neon-green) !important;
+            text-shadow: 0 0 2px var(--neon-green);
+        }
+        
+        /* Hiệu ứng quét (Scanline) */
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 0, 0.2) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 10s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix"></canvas>
+
+    <div class="editor-container" id="editorContainer">
+        <div class="scanline"></div>
+        <div class="title-bar">
+            <div class="window-controls">
+                <span class="red"></span>
+                <span class="yellow"></span>
+                <span class="green"></span>
+                studio code V1.0
+            </div>
+            <div>
+                <input type="text" id="filename" value="code.js" style="background:transparent; border:none; color: var(--neon-blue); border-bottom: 1px solid var(--neon-blue); width: 100px; text-align: right; outline: none;">
+                <button class="save-btn" onclick="saveFile()">SAVE FILE</button>
+            </div>
+        </div>
+        <textarea id="codeArea">// Welcome to the Matrix
+function TheWorld() {
+    console.log("Access Granted...");
+    return "System Breaked";
+}</textarea>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script>
+        // 1. Khởi tạo CodeMirror (Giả lập VS Code)
+        var editor = CodeMirror.fromTextArea(document.getElementById("codeArea"), {
+            lineNumbers: true,
+            mode: "javascript",
+            theme: "dracula",
+            autofocus: true
+        });
+
+        // 2. Hiệu ứng 3D xoay theo chuột
+        const container = document.getElementById('editorContainer');
+        document.addEventListener('mousemove', (e) => {
+            let xAxis = (window.innerWidth / 2 - e.pageX) / 25;
+            let yAxis = (window.innerHeight / 2 - e.pageY) / 25;
+            container.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+        });
+
+        // 3. Hiệu ứng Matrix Rain (Nền)
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレゲゼデベペオォコソトノホモヨョロヲゴゾドボポ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const nums = katakana.split('');
+
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        for(let x = 0; x < columns; x++)
+            drops[x] = 1;
+
+        function draw() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+
+            for(let i = 0; i < drops.length; i++) {
+                const text = nums[Math.floor(Math.random() * nums.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975)
+                    drops[i] = 0;
+                drops[i]++;
+            }
+        }
+        setInterval(draw, 33);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // 4. Chức năng Lưu File
+        function saveFile() {
+            const content = editor.getValue();
+            const filename = document.getElementById('filename').value || "hacker_code.txt";
+            
+            // Tạo đối tượng Blob
+            const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+            
+            // Tạo link ảo để tải xuống
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
